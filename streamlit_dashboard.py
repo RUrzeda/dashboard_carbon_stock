@@ -61,7 +61,7 @@ st.markdown("""
 @st.cache_data
 def load_data():
     """Load and process data"""
-    analyzer = BibliometricAnalyzer('/home/ubuntu/Uploads/DF_COMBINADO.csv')
+    analyzer = BibliometricAnalyzer('DF_COMBINADO_LIMPO.csv')
     results = analyzer.create_visualizations()
     return analyzer, results
 
