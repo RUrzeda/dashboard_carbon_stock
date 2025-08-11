@@ -368,39 +368,84 @@ def main():
             hide_index=True
         )
     
+# Em streamlit_dashboard.py, SUBSTITUA o conteúdo da aba "AI & Data" por este:
+
     with tab3:
-        st.markdown('<h2 class="sub-header">🔬 AI Techniques Analysis</h2>', unsafe_allow_html=True)
+        st.markdown("<h2 class='sub-header'>🤖 Most Used AI Techniques</h2>", unsafe_allow_html=True)
         
-        # AI techniques frequency
-        st.plotly_chart(
-            create_ai_techniques_chart(results['ai_techniques_df'], top_n),
-            use_container_width=True
-        )
-        
-        # AI techniques trends
-        st.markdown("### AI Techniques Trends Over Time")
-        available_techniques = results['ai_techniques_df']['Technique'].tolist()
-        selected_techniques = st.multiselect(
-            "Select AI techniques to compare trends:",
-            available_techniques,
-            default=available_techniques[:5]
-        )
-        
-        if selected_techniques:
-            fig_ai_trends = create_trends_chart(
-                results['ai_trends_df'], 
-                selected_techniques, 
-                "AI Techniques"
+        # --- Gráfico 1: Frequência Geral (já existente) ---
+        ai_techniques_df = results.get('ai_techniques_df')
+        if ai_techniques_df is not None and not ai_techniques_df.empty:
+            fig_ai_freq = px.bar(
+                ai_techniques_df,
+                x='Count',
+                y='Technique',
+                orientation='h',
+                title='Frequency of AI Techniques in Carbon Stock Studies',
+                color='Count',
+                color_continuous_scale=px.colors.sequential.Reds
+            )
+            fig_ai_freq.update_layout(
+                template='plotly_white',
+                height=600,
+                yaxis={'categoryorder': 'total ascending'}
+            )
+            st.plotly_chart(fig_ai_freq, use_container_width=True)
+        else:
+            st.warning("No AI technique data available for the selected period.")
+
+        st.markdown("---") # Linha divisória
+
+        # --- Gráfico 2: Tendências ao Longo do Tempo (NOVO) ---
+        st.markdown("<h2 class='sub-header'>📈 Trends of Top 7 AI Techniques Over Time</h2>", unsafe_allow_html=True)
+        ai_trends_df = results.get('ai_trends_df')
+        if ai_trends_df is not None and not ai_trends_df.empty:
+            fig_ai_trends = px.line(
+                ai_trends_df,
+                x='PY',
+                y='Count',
+                color='AI_Techniques',
+                title='Annual Usage of Top 7 AI Techniques',
+                markers=True,
+                labels={'PY': 'Publication Year', 'Count': 'Number of Publications', 'AI_Techniques': 'AI Technique'}
+            )
+            fig_ai_trends.update_layout(
+                template='plotly_white',
+                height=500,
+                legend_title_text='Technique'
             )
             st.plotly_chart(fig_ai_trends, use_container_width=True)
-        
-        # Insights
-        st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-        st.markdown("**🔍 AI Techniques Insights:**")
-        top_3_ai = results['ai_techniques_df'].head(3)
-        for i, row in top_3_ai.iterrows():
-            st.markdown(f"• **{row['Technique']}**: {row['Frequency']} studies")
-        st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.warning("No AI technique trend data available to display.")
+
+        ai_techniques_df = results.get('ai_techniques_df')
+        ai_trends_df = results.get('ai_trends_df')
+
+        if ai_techniques_df is not None and not ai_techniques_df.empty:
+            # Cria a caixa de insights
+            st.markdown('<div class="insight-box" style="margin-top: 2rem;">', unsafe_allow_html=True)
+            st.markdown("**🤖 AI Techniques Insights:**")
+
+            # Insight 1: Técnica mais dominante
+            top_technique = ai_techniques_df.iloc[0]
+            st.markdown(f"• **Dominant Method**: {top_technique['Technique']} is the most applied, featured in {top_technique['Count']} studies.")
+
+            # Insight 2: Segunda técnica mais popular
+            if len(ai_techniques_df) > 1:
+                second_technique = ai_techniques_df.iloc[1]
+                st.markdown(f"• **Key Contender**: {second_technique['Technique']} follows as a popular and robust alternative.")
+
+            # Insight 3: Tendência mais forte no último ano
+            if ai_trends_df is not None and not ai_trends_df.empty:
+                # Encontra o último ano com dados e a técnica mais usada nesse ano
+                latest_year = ai_trends_df['PY'].max()
+                latest_trends = ai_trends_df[ai_trends_df['PY'] == latest_year]
+                
+                if not latest_trends.empty:
+                    top_recent_technique = latest_trends.loc[latest_trends['Count'].idxmax()]
+                    st.markdown(f"• **Recent Trend**: **{top_recent_technique['AI_Techniques']}** shows strong recent usage, peaking in {int(latest_year)}.")
+
+            st.markdown('</div>', unsafe_allow_html=True )   
     
     with tab4:
         st.markdown('<h2 class="sub-header">📡 Data Types Analysis</h2>', unsafe_allow_html=True)

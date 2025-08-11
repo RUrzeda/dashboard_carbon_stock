@@ -305,49 +305,77 @@ class BibliometricAnalyzer:
         
         return list(set(data_types))
     
+    # Em bibliometric_analysis.py, SUBSTITUA o método analyze_ai_techniques por este:
+
     def analyze_ai_techniques(self):
-        """Analyze AI techniques usage"""
-        print("Analyzing AI techniques...")
+        """
+        Analyzes AI techniques for overall frequency and trends over time.
+        """
+        print("Analyzing AI techniques with improved dictionary...")
+
+        # Dicionário aprimorado de termos
+        ai_terms = {
+            'Random Forest': ['random forest', 'randomforest'],
+            'Support Vector Machine': ['support vector machine', 'svm', 'support vector regression', 'svr'],
+            'Neural Networks': ['neural network', 'ann', 'artificial neural network'],
+            'Deep Learning': ['deep learning', 'aprendizado profundo'],
+            'Convolutional NN': ['convolutional neural network', 'cnn'],
+            'Recurrent NN': ['recurrent neural network', 'rnn'],
+            'LSTM': ['long short-term memory', 'lstm'],
+            'GRU': ['gated recurrent unit', 'gru'],
+            'Transformer': ['transformer', 'transformadores'],
+            'U-Net': ['u-net', 'unet'],
+            'GAN': ['generative adversarial network', 'gan'],
+            'Autoencoder': ['autoencoder', 'auto-encoder'],
+            'Gradient Boosting': ['gradient boosting', 'gbm', 'xgboost', 'lightgbm', 'catboost'],
+            'k-Nearest Neighbors': ['k-nearest neighbors', 'knn'],
+            'Regression Models': ['regression', 'regressão'], # Simplificado para maior captura
+            'Cubist': ['cubist'],
+            'Attention Mechanism': ['attention mechanism'],
+        }
+
+        # Função interna para buscar os termos
+        def find_terms(text, terms_dict):
+            found_terms = set()
+            if pd.isna(text): return list(found_terms)
+            text_lower = text.lower()
+            for term, patterns in terms_dict.items():
+                for pattern in patterns:
+                    if pattern in text_lower:
+                        found_terms.add(term)
+                        break
+            return list(found_terms)
+
+        # Prepara a coluna de texto combinado
+        text_columns = ['TI', 'AB', 'DE']
+        for col in text_columns:
+            if col in self.df_filtered.columns:
+                self.df_filtered[col] = self.df_filtered[col].fillna('')
+        self.df_filtered['combined_text'] = self.df_filtered[text_columns].agg(' '.join, axis=1)
+
+        # Aplica a função para encontrar as técnicas
+        self.df_filtered['AI_Techniques'] = self.df_filtered['combined_text'].apply(lambda text: find_terms(text, ai_terms))
+
+        # --- Cálculo 1: Frequência Geral ---
+        df_exploded_all = self.df_filtered.explode('AI_Techniques').dropna(subset=['AI_Techniques'])
+        ai_counts = df_exploded_all['AI_Techniques'].value_counts()
+        ai_techniques_df = ai_counts.head(15).reset_index()
+        ai_techniques_df.columns = ['Technique', 'Count']
         
-        # Combine title, abstract, and keywords for analysis
-        self.df_filtered['combined_text'] = (
-            self.df_filtered['TI_clean'] + ' ' + 
-            self.df_filtered['AB_clean'] + ' ' + 
-            self.df_filtered['KW_clean']
-        )
+        # --- Cálculo 2: Tendências ao Longo do Tempo ---
+        print("Analyzing AI technique trends over time...")
+        df_exploded_trends = self.df_filtered.explode('AI_Techniques').dropna(subset=['AI_Techniques', 'PY'])
         
-        # Extract AI techniques
-        all_techniques = []
-        technique_by_year = {}
+        # Pega as 7 técnicas mais usadas para a análise de tendência
+        top_7_techniques = ai_techniques_df['Technique'].head(7).tolist()
         
-        for idx, row in self.df_filtered.iterrows():
-            techniques = self.identify_ai_techniques(row['combined_text'])
-            all_techniques.extend(techniques)
-            
-            year = row['PY']
-            if year not in technique_by_year:
-                technique_by_year[year] = []
-            technique_by_year[year].extend(techniques)
-        
-        # Overall technique frequency
-        technique_counts = Counter(all_techniques)
-        ai_techniques_df = pd.DataFrame(technique_counts.most_common(15), 
-                                      columns=['Technique', 'Frequency'])
-        
-        # Technique trends over time
-        technique_trends = {}
-        for year in range(2015, 2026):
-            year_techniques = Counter(technique_by_year.get(year, []))
-            for technique in technique_counts.keys():
-                if technique not in technique_trends:
-                    technique_trends[technique] = []
-                technique_trends[technique].append(year_techniques.get(technique, 0))
-        
-        trends_df = pd.DataFrame(technique_trends)
-        trends_df['Year'] = range(2015, 2026)
-        
-        return ai_techniques_df, trends_df
-    
+        # Agrupa por ano e técnica para obter a contagem
+        ai_trends_grouped = df_exploded_trends[df_exploded_trends['AI_Techniques'].isin(top_7_techniques)]
+        ai_trends_df = ai_trends_grouped.groupby(['PY', 'AI_Techniques']).size().reset_index(name='Count')
+
+        # Retorna ambos os DataFrames
+        return ai_techniques_df, ai_trends_df
+
     def analyze_data_types(self):
         """Analyze data types usage"""
         print("Analyzing data types...")
@@ -443,15 +471,15 @@ class BibliometricAnalyzer:
             'top_brazil_keywords': top_brazil_keywords,
             'temporal_df': temporal_df,
             'geographic_df': geographic_df,
-            'ai_techniques_df': ai_techniques_df,
-            'ai_trends_df': ai_trends_df,
+            'ai_techniques_df': ai_techniques_df, # Esta linha fica
+            'ai_trends_df': ai_trends_df,      
             'data_types_df': data_types_df,
             'data_trends_df': data_trends_df,
             'drone_count': drone_count,
             'drone_by_year': drone_by_year,
             'promising_drone_data': promising_drone_data,
-            'wordcloud_fig': fig_wordcloud,  # <-- Nova adição
-            'top_words_df': top_words_df      # <-- Nova adição
+            'wordcloud_fig': fig_wordcloud,
+            'top_words_df': top_words_df
         }
         
         return self.results
