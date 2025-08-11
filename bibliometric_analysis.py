@@ -121,29 +121,36 @@ class BibliometricAnalyzer:
         
         return top_journals, top_brazil_journals
     
+    # SUBSTITUA seu método analyze_keywords() inteiro por este
+
+# Em bibliometric_analysis.py, substitua o método analyze_keywords inteiro por este:
+
     def analyze_keywords(self):
-        """Analyze most frequent keywords"""
+        """
+        Analisa as palavras-chave, cria listas de top-10 e gera os dados para a nuvem de palavras.
+        """
         print("Analyzing keywords...")
         
-        # Extract all keywords
-        all_keywords = []
-        for kw_str in self.df_filtered['KW_clean']:
-            all_keywords.extend(self.extract_keywords(kw_str))
+        # Lógica para palavras-chave gerais (baseado em df_filtered)
+        all_keywords = self.df_filtered['DE'].dropna().str.split(';').explode().str.strip()
+        top_keywords = all_keywords.value_counts().head(10).reset_index()
+        top_keywords.columns = ['Keyword', 'Count']
         
-        keyword_counts = Counter(all_keywords)
-        top_keywords = pd.DataFrame(keyword_counts.most_common(30), 
-                                  columns=['Keyword', 'Frequency'])
+        # Lógica para palavras-chave do Brasil com uma verificação de segurança para evitar o erro
+        top_brazil_keywords = pd.DataFrame(columns=['Keyword', 'Count']) # Cria um DataFrame vazio como padrão
+        if hasattr(self, 'df_brazil') and not self.df_brazil.empty:
+            brazil_keywords = self.df_brazil['DE'].dropna().str.split(';').explode().str.strip()
+            if not brazil_keywords.empty:
+                top_brazil_keywords = brazil_keywords.value_counts().head(10).reset_index()
+                top_brazil_keywords.columns = ['Keyword', 'Count']
+
+        # Geração da nova nuvem de palavras
+        print("Generating improved word cloud...")
+        prepared_words = self._prepare_words_for_cloud(self.df_filtered['DE'])
+        fig_wordcloud, top_words_for_cloud_df = self._plot_wordcloud_figure(prepared_words)
         
-        # Brazilian keywords
-        brazil_keywords = []
-        for kw_str in self.brazil_df['KW_clean']:
-            brazil_keywords.extend(self.extract_keywords(kw_str))
-        
-        brazil_keyword_counts = Counter(brazil_keywords)
-        top_brazil_keywords = pd.DataFrame(brazil_keyword_counts.most_common(25), 
-                                         columns=['Keyword', 'Frequency'])
-        
-        return top_keywords, top_brazil_keywords
+        # Retorna todos os resultados, incluindo a nova nuvem de palavras e a tabela de palavras
+        return top_keywords, top_brazil_keywords, fig_wordcloud, top_words_for_cloud_df
     
     def analyze_temporal_evolution(self):
         """Analyze temporal evolution of publications"""
@@ -404,24 +411,29 @@ class BibliometricAnalyzer:
         
         return len(drone_studies), drone_by_year, promising_drone_data
     
+# Em bibliometric_analysis.py, substitua o método create_visualizations inteiro por este:
+
     def create_visualizations(self):
         """Create all visualizations"""
         print("Creating visualizations...")
         
-        # Load and clean data
+        # Carrega e limpa os dados
         self.load_and_clean_data()
         
-        # Perform analyses
+        # Executa as análises
         top_authors, top_brazil_authors = self.analyze_authors()
         top_journals, top_brazil_journals = self.analyze_journals()
-        top_keywords, top_brazil_keywords = self.analyze_keywords()
+        
+        # Nova chamada para analyze_keywords, que agora retorna 4 itens
+        top_keywords, top_brazil_keywords, fig_wordcloud, top_words_df = self.analyze_keywords()
+        
         temporal_df = self.analyze_temporal_evolution()
         geographic_df = self.analyze_geographic_distribution()
         ai_techniques_df, ai_trends_df = self.analyze_ai_techniques()
         data_types_df, data_trends_df = self.analyze_data_types()
         drone_count, drone_by_year, promising_drone_data = self.analyze_drone_usage()
         
-        # Store results for dashboard
+        # Armazena todos os resultados no dicionário, incluindo os da nuvem de palavras
         self.results = {
             'top_authors': top_authors,
             'top_brazil_authors': top_brazil_authors,
@@ -437,10 +449,71 @@ class BibliometricAnalyzer:
             'data_trends_df': data_trends_df,
             'drone_count': drone_count,
             'drone_by_year': drone_by_year,
-            'promising_drone_data': promising_drone_data
+            'promising_drone_data': promising_drone_data,
+            'wordcloud_fig': fig_wordcloud,  # <-- Nova adição
+            'top_words_df': top_words_df      # <-- Nova adição
         }
         
         return self.results
+
+    def _prepare_words_for_cloud(self, series):
+        """
+        Processa o texto para gerar uma lista de palavras limpas para a nuvem.
+        """
+        # Dicionário para unificar termos. Fique à vontade para customizar!
+        keyword_map = {
+            'remote sensing technology': 'remote sensing',
+            'satellite imagery': 'remote sensing',
+            'satellite remote sensing': 'remote sensing',
+            'uav': 'drone',
+            'unmanned aerial vehicle': 'drone',
+            'unmanned aerial vehicles': 'drone',
+            'carbon stocks': 'carbon stock',
+            'models': 'model',
+            'modeling': 'model',
+            'neural network': 'neural networks',
+            'deep learning model': 'deep learning',
+            'machine learning model': 'machine learning'
+        }
+        # Palavras a serem ignoradas
+        stopwords = set(['article', 'study', 'studies', 'method', 'methods', 'approach', 'based', 'using', 'application'])
+
+        all_words = []
+        # Usar .copy() para evitar o SettingWithCopyWarning
+        series_copy = series.copy()
+        series_copy.dropna(inplace=True)
+
+        for index, value in series_copy.items():
+            words = [kw.strip().lower() for kw in str(value).split(';')]
+            cleaned_words = []
+            for word in words:
+                word = keyword_map.get(word, word)
+                if word and word not in stopwords and len(word) > 2:
+                    cleaned_words.append(word)
+            all_words.extend(cleaned_words)
+        return all_words
+
+    def _plot_wordcloud_figure(self, processed_words):
+        """
+        Gera a figura da nuvem de palavras e um DataFrame com os termos mais frequentes.
+        """
+        if not processed_words:
+            return None, None
+            
+        word_counts = Counter(processed_words)
+        top_words_df = pd.DataFrame(word_counts.most_common(20), columns=['Term', 'Frequency'])
+
+        wordcloud = WordCloud(
+            width=1200, height=600, background_color='white', colormap='viridis',
+            max_words=100, contour_width=3, contour_color='steelblue',
+            collocations=False, random_state=42
+        ).generate_from_frequencies(word_counts)
+
+        fig, ax = plt.subplots(figsize=(5, 2.5))
+        ax.imshow(wordcloud, interpolation='bilinear')
+        ax.axis('off')
+        
+        return fig, top_words_df    
 
 if __name__ == "__main__":
     # Initialize analyzer

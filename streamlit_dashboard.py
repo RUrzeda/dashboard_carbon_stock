@@ -189,23 +189,7 @@ def create_geographic_chart(geo_df, top_n):
     )
     return fig
 
-def create_keyword_wordcloud(keywords_df):
-    """Create keyword word cloud"""
-    keyword_text = ' '.join([kw for kw in keywords_df['Keyword'].tolist() 
-                            for _ in range(int(keywords_df[keywords_df['Keyword'] == kw]['Frequency'].iloc[0]/10))])
-    
-    wordcloud = WordCloud(
-        width=800, 
-        height=400, 
-        background_color='white',
-        colormap='viridis',
-        max_words=100
-    ).generate(keyword_text)
-    
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.imshow(wordcloud, interpolation='bilinear')
-    ax.axis('off')
-    return fig
+
 
 def main():
     # Load data
@@ -285,20 +269,40 @@ def main():
             create_temporal_chart(results['temporal_df'], selected_years),
             use_container_width=True
         )
-        
-        # Key insights
-        st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-        st.markdown("**🔍 Key Insights:**")
-        st.markdown(f"• Research in carbon stock modeling has grown exponentially, with {results['temporal_df']['Total'].iloc[-1]} publications in 2025")
-        st.markdown(f"• {(len(analyzer.brazil_df)/len(analyzer.df_filtered)*100):.1f}% of studies focus on Brazilian ecosystems")
-        st.markdown(f"• {(results['drone_count']/len(analyzer.df_filtered)*100):.1f}% of studies utilize drone/UAV technology")
+
+        st.markdown("<h2 class='sub-header'>☁️ Word Cloud & Key Terms</h2>", unsafe_allow_html=True)
+
+       # Acessa a figura da nuvem de palavras
+        wordcloud_fig = results.get('wordcloud_fig')
+
+        if wordcloud_fig:
+            # --- INÍCIO DA MUDANÇA: CRIA COLUNAS PARA CENTRALIZAR ---
+            col1, col2, col3 = st.columns([0.2, 1, 0.2]) # Colunas laterais menores para empurrar o conteúdo central
+            with col2:
+                st.pyplot(wordcloud_fig)
+            # --- FIM DA MUDANÇA ---
+        else:
+            st.warning("No keyword data available for the selected period.")
+
+        # Caixa de insights com os termos mais frequentes
+        st.markdown('<div class="insight-box" style="margin-top: 2rem;">', unsafe_allow_html=True)
+        st.markdown("**🔑 Featured Terms in the Cloud:**")
+
+        # Acessa o DataFrame de palavras
+        top_words_df = results.get('top_words_df')
+
+        if top_words_df is not None and not top_words_df.empty:
+            # Exibe os 3 principais termos
+            for i, row in top_words_df.head(3).iterrows():
+                # Usando os novos nomes de coluna 'Term' e 'Frequency'
+                st.markdown(f"• **{row['Term'].title()}**: {row['Frequency']} mentions")
+
+            # Expander com a lista completa
+            with st.expander("See the list of the 20 most frequent terms"):
+                st.dataframe(top_words_df, use_container_width=True)
+                
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Keywords word cloud
-        st.markdown('<h3 class="sub-header">🏷️ Research Keywords</h3>', unsafe_allow_html=True)
-        fig_wordcloud = create_keyword_wordcloud(results['top_keywords'])
-        st.pyplot(fig_wordcloud)
-    
     with tab2:
         st.markdown('<h2 class="sub-header">👥 Authors & Journals Analysis</h2>', unsafe_allow_html=True)
         
