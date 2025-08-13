@@ -17,7 +17,7 @@ import re
 from collections import Counter
 import warnings
 warnings.filterwarnings('ignore')
-print("oi")
+
 # Set style for matplotlib
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
